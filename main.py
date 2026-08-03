@@ -1,173 +1,78 @@
-
-import os
-import sys
+import pygame
 import random
 
-# ������ Headless / Codespaces environment fixes ���������������������������������������������������������������������������������������������������������
-# Xvfb virtual display (started by postStartCommand)
-if not os.environ.get("DISPLAY"):
-    os.environ["DISPLAY"] = ":99"
-
-# Suppress the "XDG_RUNTIME_DIR is invalid" warning
-if not os.environ.get("XDG_RUNTIME_DIR"):
-    os.environ["XDG_RUNTIME_DIR"] = "/tmp/runtime-vscode"
-    os.makedirs("/tmp/runtime-vscode", exist_ok=True)
-
-# Tell SDL to use a dummy audio driver ��� silences all ALSA "no sound card" errors
-# (Codespaces has no audio hardware; this is safe and expected)
-os.environ["SDL_AUDIODRIVER"] = "dummy"
-
-import pygame
-
-# ���������������������������������������������������������������������������������������������������������������������������
-#  INITIALISE pygame
-# ���������������������������������������������������������������������������������������������������������������������������
 pygame.init()
-
-# ���������������������������������������������������������������������������������������������������������������������������
-#  SCREEN / WINDOW SETUP
-# ���������������������������������������������������������������������������������������������������������������������������
-SCREEN_WIDTH  = 640
-SCREEN_HEIGHT = 480
-TITLE         = "Pygame"
-
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption(TITLE)
-
-# ���������������������������������������������������������������������������������������������������������������������������
-#  CLOCK  (controls frames-per-second)
-# ���������������������������������������������������������������������������������������������������������������������������
+screen_width = 600
+screen_height = 400
+screen = pygame.display.set_mode((screen_width,screen_height))
+pygame.display.set_caption("snake")
 clock = pygame.time.Clock()
-FPS = 60
-
-# ���������������������������������������������������������������������������������������������������������������������������
-#  COLOURS  (R, G, B)
-# ���������������������������������������������������������������������������������������������������������������������������
-BLACK  = (  0,   0,   0)
-WHITE  = (255, 255, 255)
-RED    = (255,   0,   0)
-GRAY   = ( 40,  40,  40)   # subtle grid / background tint
-
-# ���������������������������������������������������������������������������������������������������������������������������
-#  GAME OBJECTS
-# ���������������������������������������������������������������������������������������������������������������������������
-
-# Player  ��� white square, starts near top-left
-player = pygame.Rect(100, 100, 40, 40)
-PLAYER_SPEED = 5
-
-# Enemy   ��� red square, starts centre-right
-enemy = pygame.Rect(300, 200, 40, 40)
-ENEMY_SPEED = 3
-
-# ���������������������������������������������������������������������������������������������������������������������������
-#  HELPER: draw a simple grid (optional visual)
-# ���������������������������������������������������������������������������������������������������������������������������
-def draw_grid():
-    for x in range(0, SCREEN_WIDTH, 40):
-        pygame.draw.line(screen, GRAY, (x, 0), (x, SCREEN_HEIGHT))
-    for y in range(0, SCREEN_HEIGHT, 40):
-        pygame.draw.line(screen, GRAY, (0, y), (SCREEN_WIDTH, y))
-
+fps = 100
 score = 0
-score_start_time = pygame.time.get_ticks()
-font = pygame.font.Font(None, 36)
-
-# ���������������������������������������������������������������������������������������������������������������������������
-#  GAME LOOP
-# ���������������������������������������������������������������������������������������������������������������������������
+direction = "right"
+save_direction = "right"
+snake = [pygame.Rect(100,100,50,50)]
+black = (0,0,0)
+blue = (6, 90, 185)
+red = (255,0,0)
+yellow = (222,229,27)
+green = (103,165,11)
 running = True
-game_over = False
-hit_sound = pygame.mixer.Sound("chord.wav")
-
+apple = pygame.Rect(158,158,35,35)
 while running:
-
-    # ������ EVENT HANDLING ���������������������������������������������������������
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                running = False
-
-    # ������ UPDATE ���������������������������������������������������������������������������������
-
-    # 1. Read keyboard input & move player
     keys = pygame.key.get_pressed()
-
-    if keys[pygame.K_LEFT]:
-        player.x -= PLAYER_SPEED
-    if keys[pygame.K_RIGHT]:
-        player.x += PLAYER_SPEED
-    if keys[pygame.K_UP]:
-        player.y -= PLAYER_SPEED          # NOTE: UP decreases y in pygame
-    if keys[pygame.K_DOWN]:
-        player.y += PLAYER_SPEED
-    
-    # Movement ���Pop��� (Scale Up Slightly)
-    if keys[pygame.K_LEFT] or keys[pygame.K_RIGHT] or keys[pygame.K_UP] or keys[pygame.K_DOWN]:
-        player.width = 44
-        player.height = 44
-    else:
-        player.width = 40
-        player.height = 40
-
-    # 2. Keep player inside the window
-    player.clamp_ip(screen.get_rect())
-
-    # 3. Move enemy left; wrap around when off-screen
-    enemy.x -= ENEMY_SPEED
-    if enemy.right < 0:
-        enemy.x = SCREEN_WIDTH
-        enemy.y = random.randint(0,440)
-    
-    if player.colliderect(enemy):
-        pygame.draw.rect(screen, (255,255,0), enemy)
-        enemy.inflate_ip(2,2)
-        pygame.display.flip()
-        pygame.time.delay(60)
-        enemy.inflate_ip(-2,-2)  
-        screen.fill((255,0,0))
-        hit_sound.play()
-        pygame.display.flip()
-        pygame.time.delay(100)        
-        game_over = True
-
-    if game_over:
-        player.x, player.y = 100, 100
-        enemy.x, enemy.y = 300, random.randint(0,440)
-        score_start_time = pygame.time.get_ticks()
-        game_over = False
-
-    # Increase score based on the timer
-    score = (pygame.time.get_ticks() - score_start_time) // 100    
-    ENEMY_SPEED = ((score // 30) + 1) * 3
-
-    # ������ RENDER ���������������������������������������������������������������������������������
-
-    # Clear the screen
-    screen.fill(BLACK)
-
-    # Optional subtle grid
-    draw_grid()
-
-    # Draw game objects
-    pygame.draw.rect(screen, WHITE, player)   # player
-    pygame.draw.rect(screen, RED,   enemy)    # enemy
-
-    score_text = font.render(f"Score: {score}", True, WHITE)
-    screen.blit(score_text, (10, 10))
-
-    # Flip / update the display
+    if(keys[pygame.K_LEFT]):
+        save_direction = "left"
+    if(keys[pygame.K_RIGHT]):
+        save_direction = "right"
+    if(keys[pygame.K_UP]):
+        save_direction = "up"
+    if(keys[pygame.K_DOWN]):
+        save_direction = "down"    
+    if snake[0].x%50==0 and snake[0].y%50==0:
+        direction = save_direction
+    if pygame.Rect.colliderect(snake[0],apple):
+        apple.x = random.randint(0,11)*50+8
+        apple.y = random.randint(0,7)*50+8
+        score += 1
+        snake.append(pygame.Rect(random.randint(0,11)*50,random.randint(0,7)*50,50,50))
+    screen.fill(green)
+    pygame.draw.line(screen,yellow,(50,0),(50,400),5)
+    pygame.draw.line(screen,yellow,(100,0),(100,400),5)
+    pygame.draw.line(screen,yellow,(150,0),(150,400),5)
+    pygame.draw.line(screen,yellow,(200,0),(200,400),5)
+    pygame.draw.line(screen,yellow,(250,0),(250,400),5)
+    pygame.draw.line(screen,yellow,(300,0),(300,400),5)
+    pygame.draw.line(screen,yellow,(350,0),(350,400),5)
+    pygame.draw.line(screen,yellow,(400,0),(400,400),5)
+    pygame.draw.line(screen,yellow,(450,0),(450,400),5)
+    pygame.draw.line(screen,yellow,(500,0),(500,400),5)
+    pygame.draw.line(screen,yellow,(550,0),(550,400),5)
+    pygame.draw.line(screen,yellow,(0,50),(600,50),5)
+    pygame.draw.line(screen,yellow,(0,100),(600,100),5)
+    pygame.draw.line(screen,yellow,(0,150),(600,150),5)
+    pygame.draw.line(screen,yellow,(0,200),(600,200),5)
+    pygame.draw.line(screen,yellow,(0,250),(600,250),5)
+    pygame.draw.line(screen,yellow,(0,300),(600,300),5)
+    pygame.draw.line(screen,yellow,(0,350),(600,350),5)
+    for i in range(0,len(snake)):
+        pygame.draw.rect(screen,blue,snake[i])
+    pygame.draw.rect(screen,red,apple)
+    myfont = pygame.font.SysFont('comic sans',50)
+    textsurface = myfont.render("score=" +str(score),True,black)
+    screen.blit(textsurface, (0,0))
+    if direction == "left":
+        snake[0].x -= 2
+    if direction == "right":
+        snake[0].x += 2
+    if direction == "up":
+        snake[0].y -= 2
+    if direction == "down":
+        snake[0].y += 2
+    snake[0].clamp_ip(screen.get_rect())
     pygame.display.flip()
-
-    # Tick the clock (cap at FPS)
-    clock.tick(FPS)
-
-
-# ���������������������������������������������������������������������������������������������������������������������������
-#  CLEAN UP
-# ���������������������������������������������������������������������������������������������������������������������������
+    clock.tick(fps)
 pygame.quit()
-sys.exit()
-    
